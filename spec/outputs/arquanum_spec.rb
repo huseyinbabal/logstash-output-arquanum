@@ -5,6 +5,7 @@ require 'logstash/outputs/arquanum'
 describe 'outputs/arquanum' do
   let(:config) { { 'key' => 'custom_key' } }
 
+=begin
   let(:event) do
     LogStash::Event.new(
         'message' => 'SELECT *FROM products WHERE 1=1',
@@ -61,4 +62,5 @@ describe 'outputs/arquanum' do
       output.receive(event)
     end
   end
+=end
 end
