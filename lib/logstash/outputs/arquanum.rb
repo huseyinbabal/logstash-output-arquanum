@@ -1,56 +1,45 @@
 # encoding: utf-8
-require "logstash/outputs/base"
-require "logstash/namespace"
-require "uri"
-require "net/http"
-require "net/https"
-
-
-# http://jira.codehaus.org/browse/JRUBY-5529
-Net::BufferedIO.class_eval do
-  BUFSIZE = 1024 * 16
-
-  def rbuf_fill
-    timeout(@read_timeout) {
-      @rbuf << @io.sysread(BUFSIZE)
-    }
-  end
-end
+require 'logstash/outputs/base'
+require 'logstash/namespace'
 
 # Arquanum Logstash Plugin lets you to send your logs to arquanum log
 # analyzing system to perform deep machine learning testing to
 # detect possible security attacks.
 
 class LogStash::Outputs::Arquanum < LogStash::Outputs::Base
+
+  attr_reader :client
+
   config_name "arquanum"
 
-  # Hostname for handling log sending event
+  # api_url is used for sending log data to Arquanum.
+  # This url is configurable according to region of your
+  # application source. This will be "logs.arquanum.com" by default
+  config :api_url, :validate => :string, :default => "https://api.arquanum.com/logs"
 
-  config :host, :validate => :string, :default => "logs.arquanum.com"
+  # There may be 2 versions of the api at a time. You can use specific
+  # version according to your needs. If we release new features, you can
+  # test it by switching your api_version
+  config :api_version, :validate => :string, :default => "1.0"
 
-  # The loggly http input key to send to.
-  # This is usually visible in the Loggly 'Inputs' page as something like this:
-  # ....
-  #     https://logs.hoover.loggly.net/inputs/abcdef12-3456-7890-abcd-ef0123456789
-  #                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  #                                           \---------->   key   <-------------/
-  # ....
-  # You can use `%{foo}` field lookups here if you need to pull the api key from
-  # the event. This is mainly aimed at multitenant hosting providers who want
-  # to offer shipping a customer's logs to that customer's loggly account.
-  config :key, :validate => :string, :required => true
+  # app_id is for grouping your log data on Arqunum
+  # according to your app_id. Before starting sending log data,
+  # you need to create application on Arquanum. For example, you can
+  # create "test" application for testing your integration
+  # By doing this, you can isolate your logs from different
+  # environments. Some application examples: "Dev Logs",
+  # "QA Logs", "Prod Logs", etc...
+  config :app_id, :validate => :string
 
-  # Should the log action be sent over https instead of plain http
-  config :proto, :validate => :string, :default => "http"
+  # If you have Arquanum account, you can grab your token
+  # from Arquanum App Dashboard http://admin.arquanum.com/apps.
+  # This token will be used for authorizing your requests
+  config :token, :validate => :string, :required => true
 
   # Loggly Tag
   # Tag helps you to find your logs in the Loggly dashboard easily
   # You can make a search in Loggly using tag as "tag:logstash-contrib"
   # or the tag set by you in the config file.
-  #
-  # You can use %{somefield} to allow for custom tag values.
-  # Helpful for leveraging Loggly source groups.
-  # https://www.loggly.com/docs/source-groups/
   config :tag, :validate => :string, :default => "logstash"
 
   # Proxy Host
@@ -65,30 +54,20 @@ class LogStash::Outputs::Arquanum < LogStash::Outputs::Base
   # Proxy Password
   config :proxy_password, :validate => :password, :default => ""
 
-
   public
   def register
-    # nothing to do
+    @client = LogStash::Outputs::Arquanum::ArquanumClient.new(:options => create_options)
   end
 
   public
   def receive(event)
-
-
     if event == LogStash::SHUTDOWN
       finished
       return
     end
 
-    key = event.sprintf(@key)
-    tag = event.sprintf(@tag)
-
-    # For those cases where %{somefield} doesn't exist
-    # we should ship logs with the default tag value.
-    tag = 'logstash' if /^%{\w+}/.match(tag)
-
     # Send event
-    send_event("#{@proto}://#{@host}/inputs/#{key}/tag/#{tag}", format_message(event))
+    send_event(format_message(event))
   end # def receive
 
   public
@@ -97,29 +76,28 @@ class LogStash::Outputs::Arquanum < LogStash::Outputs::Base
   end
 
   private
-  def send_event(url, message)
-    url = URI.parse(url)
-    @logger.info("Arquanum URL", :url => url)
+  def create_options
+    {
+        :api_url => @config[:api_url],
+        :api_version => @config[:api_version],
+        :token => @config[:token],
+        :app_id => @config[:app_id],
+        :tag => @config[:tag],
+        :proxy_host => @config[:proxy_host],
+        :proxy_port => @config[:proxy_port],
+        :proxy_user => @config[:proxy_user],
+        :proxy_password => @config[:proxy_password]
+    }
+  end
 
-    http = Net::HTTP::Proxy(@proxy_host,
-                            @proxy_port,
-                            @proxy_user,
-                            @proxy_password.value).new(url.host, url.port)
-
-    if url.scheme == 'https'
-      http.use_ssl = true
-      http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-    end
-
-    # post message
-    request = Net::HTTP::Post.new(url.path)
-    request.body = message
-    response = http.request(request)
-
-    if response.is_a?(Net::HTTPSuccess)
-      @logger.info("Event send to Arquanum successfully.")
-    else
-      @logger.warn("Error occured while sending event to Arquanum: ", :error => response.error!)
+  private
+  def send_event(message)
+    response = @client::send(:message => message)
+    case response.code
+      when 200
+        @logger.info("Log entry sent to Arquanum successfully.")
+      when 500...600
+        @logger.warn("Error occured while sending log entry to Arquanum: ", :error => response.error)
     end
   end # def send_event
 

@@ -2,65 +2,53 @@
 require 'logstash/devutils/rspec/spec_helper'
 require 'logstash/outputs/arquanum'
 
-describe 'outputs/arquanum' do
-  let(:config) { { 'key' => 'custom_key' } }
+describe "outputs/arquanum" do
+  let(:config) {
+    {
+        'token' => 'very_secret_token_12345',
+        'app_id' => 'app_id_12345'
+    }
+  }
 
-=begin
   let(:event) do
     LogStash::Event.new(
-        'message' => 'SELECT *FROM products WHERE 1=1',
-        'source' => 'productfoundation',
-        'type' => 'nginx',
+        'message' => 'this is log message',
+        'source' => 'product foundation',
+        'type' => 'access',
         '@timestamp' => LogStash::Timestamp.now)
   end
 
-  context 'when initializing' do
-    subject { LogStash::Outputs::Arquanum.new(config) }
-
-    it 'should register' do
-      expect { subject.register }.to_not raise_error
-    end
-
-    it 'should have default config values' do
-      insist { subject.proto } == 'http'
-      insist { subject.host } == 'logs.arquanum.com'
-      insist { subject.tag } == 'logstash'
-    end
+  let(:ao) do
+    LogStash::Outputs::Arquanum.new(config)
   end
 
-  context 'when outputting messages' do
-    it 'should support field interpolation on key' do
-      event['token'] = 'tokenssshhhhtoken'
-      config['key'] = '%{token}'
-
-      output = LogStash::Outputs::Arquanum.new(config)
-      allow(output).to receive(:send_event).with('http://logs.arquanum.com/tokenssshhhhtoken/tag/logstash',
-                                                 event.to_json)
-      output.receive(event)
-    end
-
-    it 'should set the default tag to logstash' do
-      output = LogStash::Outputs::Arquanum.new(config)
-      allow(output).to receive(:send_event).with('http://logs.arquanum.com/tokenssshhhhtoken/tag/logstash',
-                                                 event.to_json)
-      output.receive(event)
-    end
-
-    it 'should support field interpolation for tag' do
-      config['tag'] = '%{source}'
-      output = LogStash::Outputs::Arquanum.new(config)
-      allow(output).to receive(:send_event).with('http://logs.arquanum.com/tokenssshhhhtoken/tag/productfoundation',
-                                                 event.to_json)
-      output.receive(event)
-    end
-
-    it 'should default tag to logstash if interpolated field does not exist' do
-      config['tag'] = '%{foobar}'
-      output = LogStash::Outputs::Arquanum.new(config)
-      allow(output).to receive(:send_event).with('http://logs.arquanum.com/tokenssshhhhtoken/tag/logstash',
-                                                 event.to_json)
-      output.receive(event)
-    end
+=begin
+  let(:client) do
+    options = {
+        :api_url => "1",
+        :api_version => "2",
+        :token => "3",
+        :app_id => "4",
+        :tag => "5",
+        :proxy_host => "6",
+        :proxy_port => "7",
+        :proxy_user => "8",
+        :proxy_password => "9"
+    }
+    LogStash::Outputs::Arquanum::ArquanumClient.new(options)
   end
 =end
+
+  around(:each) do |block|
+    ao.register
+    block.call()
+    ao.close
+  end
+
+  context 'when initializing' do
+    it 'should set default api_url if not set' do
+      allow(ao).to receive(:send_event).with(event.to_json)
+      ao.receive(event)
+    end
+  end
 end
