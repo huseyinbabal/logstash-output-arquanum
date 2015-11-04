@@ -8,7 +8,7 @@ Gem::Specification.new do |s|
   s.authors         = ["Arquanum"]
   s.email           = 'info@arquanum.com'
   s.homepage        = "http://www.arquanum.com/guide/en/plugins/arquanum"
-  s.require_paths = ["lib"]
+  s.require_paths   = ["lib"]
 
   # Files
   s.files = Dir['lib/**/*','spec/**/*','vendor/**/*','*.gemspec','*.md','CONTRIBUTORS','Gemfile','LICENSE','NOTICE.TXT']
@@ -23,5 +23,5 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "logstash-core", ">= 2.0.0.rc1", "< 3.0.0"
   s.add_runtime_dependency "httparty", "~> 0.13.7"
   s.add_development_dependency 'logstash-devutils', '~> 0.0.18'
-  s.add_development_dependency 'logstash-codec-plain'
+  s.add_development_dependency 'logstash-codec-plain', '~> 2.0', '>= 2.0.2'
 end

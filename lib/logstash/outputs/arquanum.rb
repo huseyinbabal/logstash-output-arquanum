@@ -1,14 +1,14 @@
 # encoding: utf-8
 require 'logstash/outputs/base'
 require 'logstash/namespace'
+require 'httparty'
 
 # Arquanum Logstash Plugin lets you to send your logs to arquanum log
 # analyzing system to perform deep machine learning testing to
 # detect possible security attacks.
 
 class LogStash::Outputs::Arquanum < LogStash::Outputs::Base
-
-  attr_reader :client
+  include HTTParty
 
   config_name "arquanum"
 
@@ -56,7 +56,7 @@ class LogStash::Outputs::Arquanum < LogStash::Outputs::Base
 
   public
   def register
-    @client = LogStash::Outputs::Arquanum::ArquanumClient.new(:options => create_options)
+    self.class.http_proxy @proxy_host, @proxy_port, @proxy_user, @proxy_pass
   end
 
   public
@@ -76,23 +76,8 @@ class LogStash::Outputs::Arquanum < LogStash::Outputs::Base
   end
 
   private
-  def create_options
-    {
-        :api_url => @config[:api_url],
-        :api_version => @config[:api_version],
-        :token => @config[:token],
-        :app_id => @config[:app_id],
-        :tag => @config[:tag],
-        :proxy_host => @config[:proxy_host],
-        :proxy_port => @config[:proxy_port],
-        :proxy_user => @config[:proxy_user],
-        :proxy_password => @config[:proxy_password]
-    }
-  end
-
-  private
   def send_event(message)
-    response = @client::send(:message => message)
+    response = send(:message => message)
     case response.code
       when 200
         @logger.info("Log entry sent to Arquanum successfully.")
@@ -100,5 +85,28 @@ class LogStash::Outputs::Arquanum < LogStash::Outputs::Base
         @logger.warn("Error occured while sending log entry to Arquanum: ", :error => response.error)
     end
   end # def send_event
+
+  private
+  def send(message)
+    @logger.info("Arquanum Request Payload: ", :api_url => @api_url, :query => create_payload(:message => message), :headers => create_headers)
+    self.class.post @api_url, :query => create_payload(:message => message), :headers => create_headers
+  end
+
+  private
+  def create_payload(message)
+    {
+        :app_id => @app_id,
+        :tag => @tag,
+        :message => message
+    }
+  end
+
+  private
+  def create_headers
+    {
+        :'Authorization' => "Bearer #{@token}",
+        :'X-Api-Version' => @api_version
+    }
+  end
 
 end # class LogStash::Outputs::Arquanum

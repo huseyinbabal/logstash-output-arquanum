@@ -2,7 +2,7 @@
 require 'logstash/devutils/rspec/spec_helper'
 require 'logstash/outputs/arquanum'
 
-describe "outputs/arquanum" do
+describe 'outputs/arquanum' do
   let(:config) {
     {
         'token' => 'very_secret_token_12345',
@@ -21,23 +21,6 @@ describe "outputs/arquanum" do
   let(:ao) do
     LogStash::Outputs::Arquanum.new(config)
   end
-
-=begin
-  let(:client) do
-    options = {
-        :api_url => "1",
-        :api_version => "2",
-        :token => "3",
-        :app_id => "4",
-        :tag => "5",
-        :proxy_host => "6",
-        :proxy_port => "7",
-        :proxy_user => "8",
-        :proxy_password => "9"
-    }
-    LogStash::Outputs::Arquanum::ArquanumClient.new(options)
-  end
-=end
 
   around(:each) do |block|
     ao.register
