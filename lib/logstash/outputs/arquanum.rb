@@ -75,38 +75,37 @@ class LogStash::Outputs::Arquanum < LogStash::Outputs::Base
     event.to_json
   end
 
-  private
   def send_event(message)
-    response = send(:message => message)
-    case response.code
-      when 200
-        @logger.info("Log entry sent to Arquanum successfully.")
-      when 500...600
-        @logger.warn("Error occured while sending log entry to Arquanum: ", :error => response.error)
+    begin
+      response = send(message)
+      parsed_response = response.parsed_response
+      case parsed_response['success'].to_s
+        when 'true'
+          @logger.info("Log entry sent to Arquanum successfully.")
+        when 'false'
+          @logger.warn("Error occured while sending log entry to Arquanum: ", :error => parsed_response['result'])
+      end
+    rescue StandardError => err
+      @logger.warn("Couldn't connect to Arquanum: ", :error => err)
     end
   end # def send_event
 
-  private
   def send(message)
-    @logger.info("Arquanum Request Payload: ", :api_url => @api_url, :query => create_payload(:message => message), :headers => create_headers)
-    self.class.post @api_url, :query => create_payload(:message => message), :headers => create_headers
-  end
 
-  private
-  def create_payload(message)
-    {
+    @payload = {
         :app_id => @app_id,
         :tag => @tag,
         :message => message
     }
-  end
 
-  private
-  def create_headers
-    {
-        :'Authorization' => "Bearer #{@token}",
-        :'X-Api-Version' => @api_version
+    @headers = {
+        'Authorization' => "Bearer #{@token}",
+        'X-Api-Version' => @api_version,
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json'
     }
+    @logger.info("Arquanum Request Payload: ", :api_url => @api_url, :body => @payload, :headers => @headers)
+    self.class.post @api_url, :body => JSON.dump(@payload), :headers => @headers
   end
 
 end # class LogStash::Outputs::Arquanum

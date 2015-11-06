@@ -59,5 +59,10 @@ describe 'outputs/arquanum' do
       allow(ao).to receive(:send_event).with(event.to_json)
       ao.receive(event)
     end
+
+    it 'should send message' do
+      allow(ao).to receive(:send).with(event.to_json)
+      ao.send_event(event.to_json)
+    end
   end
 end
